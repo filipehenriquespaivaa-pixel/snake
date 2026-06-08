@@ -1,0 +1,59 @@
+{
+  "name": "Mini Motor — Snake",
+  "short_name": "Snake",
+  "description": "Mini Motor Snake — jogo 2D de cobrinha desenvolvido com a engine Mini Motor em HTML5/JavaScript puro.",
+  "start_url": "./snake__2_.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050d05",
+  "theme_color": "#2ecc71",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "scope": "./",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icon2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "1600x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Tela inicial do Mini Motor Snake"
+    },
+    {
+      "src": "screenshot2.png",
+      "sizes": "1600x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Gameplay — cobrinha em ação"
+    },
+    {
+      "src": "screenshot3.png",
+      "sizes": "1600x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Game over"
+    },
+    {
+      "src": "screenshot4.png",
+      "sizes": "1600x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Gameplay — pontuação"
+    }
+  ],
+  "prefer_related_applications": false
+}
