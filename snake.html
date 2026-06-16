@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>Mini Motor — Snake</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2ecc71">
+    <link rel="apple-touch-icon" href="icon.png">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+        /* ── Aviso de rotação (só aparece em portrait) ─────────────────────── */
+        #rotate-msg {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #050d05;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            color: #2ecc71;
+            font: bold 18px monospace;
+            text-align: center;
+        }
+        #rotate-msg .icon { font-size: 64px; animation: gira 1.4s ease-in-out infinite alternate; }
+        @keyframes gira {
+            from { transform: rotate(-20deg); }
+            to   { transform: rotate( 20deg); }
+        }
+
+        @media (orientation: portrait) {
+            #rotate-msg { display: flex; }
+            #mm-canvas, #cfg-btn, #cfg-menu { visibility: hidden; }
+        }
+
+        /* Fundo stretch: preenche a tela toda sem tocar no motor */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                /* Grade sutil igual à do jogo */
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 39px,
+                    rgba(15, 24, 15, 0.6) 39px,
+                    rgba(15, 24, 15, 0.6) 40px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 39px,
+                    rgba(15, 24, 15, 0.6) 39px,
+                    rgba(15, 24, 15, 0.6) 40px
+                ),
+                /* Gradiente de fundo — mesma paleta escura do jogo */
+                radial-gradient(ellipse at center, #0d1a0d 0%, #050d05 100%);
+            background-size: 40px 40px, 40px 40px, 100% 100%;
+        }
+
+        #mm-canvas { display: block; position: absolute; z-index: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- Aviso de rotação — visível apenas em portrait via CSS @media -->
+    <div id="rotate-msg">
+        <div class="icon">📱</div>
+        <div>Gire o dispositivo</div>
+        <div style="font-size:13px;color:#555;margin-top:-10px;">O jogo requer modo paisagem</div>
+    </div>
+
+    <canvas id="mm-canvas"></canvas>
+
+    <!-- ── Botão de configuração (overlay HTML — fora do motor) ────────────── -->
+    <div id="cfg-btn" title="Configurações">⚙</div>
+
+    <div id="cfg-menu" aria-hidden="true">
+        <button id="cfg-mudo">🔊 Mudo</button>
+
+        <div class="cfg-separador"></div>
+
+        <div class="cfg-slider-row">
+            <span class="cfg-slider-label">🎵 Efeitos</span>
+            <div class="cfg-slider-track">
+                <div class="cfg-slider-fill" id="cfg-vol-efeitos-fill"></div>
+            </div>
+            <button class="cfg-vol-btn" id="cfg-vol-efeitos-menos">−</button>
+            <span class="cfg-vol-pct" id="cfg-vol-efeitos-pct">100%</span>
+            <button class="cfg-vol-btn" id="cfg-vol-efeitos-mais">+</button>
+        </div>
+
+        <div class="cfg-slider-row">
+            <span class="cfg-slider-label">🔔 Música</span>
+            <div class="cfg-slider-track">
+                <div class="cfg-slider-fill" id="cfg-vol-musica-fill"></div>
+            </div>
+            <button class="cfg-vol-btn" id="cfg-vol-musica-menos">−</button>
+            <span class="cfg-vol-pct" id="cfg-vol-musica-pct">100%</span>
+            <button class="cfg-vol-btn" id="cfg-vol-musica-mais">+</button>
+        </div>
+
+        <div class="cfg-separador"></div>
+
+        <button id="cfg-menu-principal">🏠 Menu Principal</button>
+        <button id="cfg-sair">✕ Sair</button>
+    </div>
+
+    <style>
+        #cfg-btn {
+            position: fixed;
+            top: 12px;
+            right: 14px;
+            z-index: 100;
+            width:  40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: rgba(10, 20, 10, 0.72);
+            border: 1px solid rgba(46, 204, 113, 0.30);
+            border-radius: 8px;
+            color: rgba(46, 204, 113, 0.80);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s, color 0.15s;
+        }
+        #cfg-btn:hover, #cfg-btn.aberto {
+            background: rgba(20, 40, 20, 0.92);
+            color: #2ecc71;
+            border-color: rgba(46, 204, 113, 0.60);
+        }
+
+        #cfg-menu {
+            position: fixed;
+            top: 58px;
+            right: 14px;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(8, 18, 8, 0.95);
+            border: 1px solid rgba(46, 204, 113, 0.25);
+            border-radius: 10px;
+            padding: 10px 8px;
+            min-width: 220px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+        }
+        #cfg-menu.visivel { display: flex; }
+
+        #cfg-menu button {
+            background: rgba(20, 40, 20, 0.60);
+            border: 1px solid rgba(46, 204, 113, 0.20);
+            border-radius: 7px;
+            color: rgba(200, 230, 200, 0.90);
+            font: 15px monospace;
+            padding: 9px 14px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s;
+            width: 100%;
+        }
+        #cfg-menu button:hover {
+            background: rgba(46, 204, 113, 0.18);
+            border-color: rgba(46, 204, 113, 0.50);
+            color: #2ecc71;
+        }
+        #cfg-menu button.ativo {
+            color: #f1c40f;
+            border-color: rgba(241, 196, 15, 0.40);
+        }
+
+        .cfg-separador {
+            height: 1px;
+            background: rgba(46, 204, 113, 0.12);
+            margin: 2px 4px;
+        }
+
+        .cfg-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 4px;
+        }
+        .cfg-slider-label {
+            font: 13px monospace;
+            color: rgba(200, 230, 200, 0.70);
+            min-width: 72px;
+        }
+        .cfg-slider-track {
+            flex: 1;
+            height: 7px;
+            background: rgba(46, 204, 113, 0.10);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(46, 204, 113, 0.15);
+        }
+        .cfg-slider-fill {
+            height: 100%;
+            background: #2ecc71;
+            border-radius: 4px;
+            transition: width 0.1s;
+            width: 100%;
+        }
+        .cfg-vol-btn {
+            background: rgba(20, 40, 20, 0.70) !important;
+            border: 1px solid rgba(46, 204, 113, 0.25) !important;
+            border-radius: 5px !important;
+            color: #2ecc71 !important;
+            font: bold 15px monospace !important;
+            padding: 0 !important;
+            width: 24px !important;
+            height: 24px !important;
+            min-width: 24px !important;
+            text-align: center !important;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .cfg-vol-btn:hover {
+            background: rgba(46, 204, 113, 0.25) !important;
+        }
+        .cfg-vol-pct {
+            font: 11px monospace;
+            color: rgba(200, 230, 200, 0.45);
+            min-width: 34px;
+            text-align: right;
+        }
+    </style>
+
+    <script>
+        (function () {
+            var btn              = document.getElementById('cfg-btn');
+            var menu             = document.getElementById('cfg-menu');
+            var btnMudo          = document.getElementById('cfg-mudo');
+            var btnMenuPrincipal = document.getElementById('cfg-menu-principal');
+            var btnSair          = document.getElementById('cfg-sair');
+
+            var volMusFill  = document.getElementById('cfg-vol-musica-fill');
+            var volMusPct   = document.getElementById('cfg-vol-musica-pct');
+            var volEfxFill  = document.getElementById('cfg-vol-efeitos-fill');
+            var volEfxPct   = document.getElementById('cfg-vol-efeitos-pct');
+
+            function audio() {
+                return MiniMotor && MiniMotor.Servicos && MiniMotor.Servicos.Audio;
+            }
+            function tela() {
+                return MiniMotor && MiniMotor.Servicos && MiniMotor.Servicos.Tela;
+            }
+
+            function abrirFechar() {
+                var aberto = menu.classList.toggle('visivel');
+                btn.classList.toggle('aberto', aberto);
+                if (aberto) atualizarUI();
+            }
+
+            function fechar() {
+                menu.classList.remove('visivel');
+                btn.classList.remove('aberto');
+            }
+
+            function atualizarUI() {
+                var A = audio();
+                if (!A) return;
+
+                // Mudo
+                var mutado = A.estaaMutado();
+                btnMudo.textContent = mutado ? '🔇 Ativar som' : '🔊 Mudo';
+                btnMudo.classList.toggle('ativo', mutado);
+
+                // Volume música
+                var vm = A.obterVolMusica ? A.obterVolMusica() : 1;
+                volMusFill.style.width = (vm * 100) + '%';
+                volMusPct.textContent  = ((vm * 100) | 0) + '%';
+
+                // Volume efeitos
+                var ve = A.obterVolEfeitos ? A.obterVolEfeitos() : 1;
+                volEfxFill.style.width = (ve * 100) + '%';
+                volEfxPct.textContent  = ((ve * 100) | 0) + '%';
+            }
+
+            // ── Abrir/fechar ──────────────────────────────────────────────────
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation(); abrirFechar();
+            });
+            btn.addEventListener('touchend', function (e) {
+                e.preventDefault(); e.stopPropagation(); abrirFechar();
+            });
+
+            // ── Mudo ──────────────────────────────────────────────────────────
+            function _acaoMudo() {
+                var A = audio(); if (A) A.alternarMudo();
+                atualizarUI(); fechar();
+                var T = tela(); if (T && T.telaCheia) T.telaCheia();
+            }
+            btnMudo.addEventListener('click', _acaoMudo);
+            btnMudo.addEventListener('touchend', function (e) {
+                e.preventDefault(); e.stopPropagation(); _acaoMudo();
+            });
+
+            // ── Volume música −/+ ─────────────────────────────────────────────
+            function _volMusica(delta) {
+                var A = audio(); if (!A || !A.obterVolMusica) return;
+                var v = Math.round((A.obterVolMusica() + delta) * 10) / 10;
+                if (v < 0) v = 0; if (v > 1) v = 1;
+                A.definirVolMusica(v); atualizarUI();
+            }
+            document.getElementById('cfg-vol-musica-menos').addEventListener('click', function (e) { e.stopPropagation(); _volMusica(-0.1); });
+            document.getElementById('cfg-vol-musica-mais').addEventListener('click',  function (e) { e.stopPropagation(); _volMusica( 0.1); });
+            document.getElementById('cfg-vol-musica-menos').addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); _volMusica(-0.1); });
+            document.getElementById('cfg-vol-musica-mais').addEventListener('touchend',  function (e) { e.preventDefault(); e.stopPropagation(); _volMusica( 0.1); });
+
+            // ── Volume efeitos −/+ ────────────────────────────────────────────
+            function _volEfeitos(delta) {
+                var A = audio(); if (!A || !A.obterVolEfeitos) return;
+                var v = Math.round((A.obterVolEfeitos() + delta) * 10) / 10;
+                if (v < 0) v = 0; if (v > 1) v = 1;
+                A.definirVolEfeitos(v); atualizarUI();
+            }
+            document.getElementById('cfg-vol-efeitos-menos').addEventListener('click', function (e) { e.stopPropagation(); _volEfeitos(-0.1); });
+            document.getElementById('cfg-vol-efeitos-mais').addEventListener('click',  function (e) { e.stopPropagation(); _volEfeitos( 0.1); });
+            document.getElementById('cfg-vol-efeitos-menos').addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); _volEfeitos(-0.1); });
+            document.getElementById('cfg-vol-efeitos-mais').addEventListener('touchend',  function (e) { e.preventDefault(); e.stopPropagation(); _volEfeitos( 0.1); });
+
+            // ── Menu Principal ────────────────────────────────────────────────
+            function _acaoMenuPrincipal() {
+                if (MiniMotor && MiniMotor.Jogo && typeof MiniMotor.Jogo.irParaMenu === 'function') {
+                    MiniMotor.Jogo.irParaMenu();
+                } else if (MiniMotor && MiniMotor.Servicos && MiniMotor.Servicos.Audio) {
+                    MiniMotor.Servicos.Audio.pararTudo();
+                }
+                fechar();
+            }
+            btnMenuPrincipal.addEventListener('click', _acaoMenuPrincipal);
+            btnMenuPrincipal.addEventListener('touchend', function (e) {
+                e.preventDefault(); e.stopPropagation(); _acaoMenuPrincipal();
+            });
+
+            // ── Sair ──────────────────────────────────────────────────────────
+            function _acaoSair() {
+                if (confirm('Sair do jogo?')) window.close();
+            }
+            btnSair.addEventListener('click', _acaoSair);
+            btnSair.addEventListener('touchend', function (e) {
+                e.preventDefault(); e.stopPropagation(); _acaoSair();
+            });
+
+            // ── Fecha ao clicar/tocar fora ────────────────────────────────────
+            document.addEventListener('click', function (e) {
+                if (!menu.contains(e.target) && e.target !== btn) fechar();
+                var T = tela(); if (T && T.telaCheia) T.telaCheia();
+            });
+            document.addEventListener('touchend', function (e) {
+                if (!menu.contains(e.target) && e.target !== btn) fechar();
+                var T = tela(); if (T && T.telaCheia) T.telaCheia();
+            });
+        }());
+    </script>
+
+    <!-- 1. Config -->
+    
+
+    <!-- 2. Núcleo -->
+    
+    
+
+    <!-- 3. Gerentes -->
+    
+    
+    
+    
+    
+    
+    
+
+    <!-- 4. Manifesto (carrega plugins dinamicamente) -->
+    
+
+    <!-- 5. Jogo -->
+    
+
+    <!-- 6. Boot -->
+    
+
+
+<script src="motor.js"></script>
+
+
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js')
+        .catch(err => console.warn('[PWA] SW não registrado:', err));
+    });
+  }
+</script>
+
+</body>
+</html>
